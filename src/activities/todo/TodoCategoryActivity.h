@@ -15,7 +15,4 @@ class TodoCategoryActivity final : public Activity {
   void onEnter() override;
   void loop() override;
   void render(RenderLock&&) override;
-
- private:
-  const char* title() const;
 };

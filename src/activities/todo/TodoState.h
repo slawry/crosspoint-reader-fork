@@ -26,3 +26,7 @@ class TodoState : public PersistableStore<TodoState> {
 
 // Helper macro to access Todo app state
 #define TODO_STATE TodoState::getInstance()
+
+// Display name for a category, shared by every screen that lists categories
+// (TodoHomeActivity's list, TodoCategoryActivity's placeholder title).
+const char* todoCategoryTitle(TodoState::TodoCategory category);

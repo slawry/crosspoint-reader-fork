@@ -7,155 +7,165 @@
 
 #include "MappedInputManager.h"
 #include "TodoButtonMapping.h"
+#include "TodoClock.h"
 #include "TodoData.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
-void TodoListActivity::onEnter() {
-  Activity::onEnter();
-  requestUpdateAndWait();  // Draw immediately instead of waiting for the next input event.
+TodoListActivity::CycleView TodoListActivity::buildCycleView(const TodoLocalTime* now) const {
+  CycleView view;
+  view.hasFavourites = (listType == TodoListType::Todo) && TODO_DATA.hasFavourites();
+  view.lists = TODO_DATA.getVisibleLists(listType, now);
+  return view;
 }
 
-int TodoListActivity::cycleEntryCount() const {
-  return static_cast<int>(TODO_DATA.getLists().size()) + (TODO_DATA.hasFavourites() ? 1 : 0);
+int TodoListActivity::cycleEntryCount(const CycleView& view) const {
+  return static_cast<int>(view.lists.size()) + (view.hasFavourites ? 1 : 0);
 }
 
-bool TodoListActivity::isFavouritesEntry(const int index) const { return TODO_DATA.hasFavourites() && index == 0; }
+bool TodoListActivity::isFavouritesEntry(const int index, const CycleView& view) const {
+  return view.hasFavourites && index == 0;
+}
 
-int TodoListActivity::listIdForCycleEntry(const int index) const {
-  if (isFavouritesEntry(index)) return -1;
-  const int offset = TODO_DATA.hasFavourites() ? 1 : 0;
-  const auto& lists = TODO_DATA.getLists();
+const TodoList* TodoListActivity::listForCycleEntry(const int index, const CycleView& view) const {
+  if (isFavouritesEntry(index, view)) return nullptr;
+  const int offset = view.hasFavourites ? 1 : 0;
   const int idx = index - offset;
-  if (idx < 0 || idx >= static_cast<int>(lists.size())) return -1;
-  return lists[idx].id;
+  if (idx < 0 || idx >= static_cast<int>(view.lists.size())) return nullptr;
+  return view.lists[idx];
 }
 
-std::string TodoListActivity::cycleEntryName(const int index) const {
-  if (isFavouritesEntry(index)) return tr(STR_TODO_FAVOURITES);
-  const int listId = listIdForCycleEntry(index);
-  for (const auto& list : TODO_DATA.getLists()) {
-    if (list.id == listId) return list.name;
-  }
-  return "";
+std::string TodoListActivity::cycleEntryName(const int index, const CycleView& view) const {
+  if (isFavouritesEntry(index, view)) return tr(STR_TODO_FAVOURITES);
+  const TodoList* list = listForCycleEntry(index, view);
+  return list ? list->name : "";
 }
 
-std::vector<int> TodoListActivity::currentTaskIds() const {
-  if (isFavouritesEntry(cycleIndex)) return TODO_DATA.getFavouriteTaskIds();
-  return TODO_DATA.getTaskIdsInList(listIdForCycleEntry(cycleIndex));
+std::vector<int> TodoListActivity::currentTaskIds(const CycleView& view) const {
+  if (isFavouritesEntry(cycleIndex, view)) return TODO_DATA.getFavouriteTaskIds();
+  const TodoList* list = listForCycleEntry(cycleIndex, view);
+  return list ? TODO_DATA.getTaskIdsInList(list->id) : std::vector<int>{};
 }
 
-void TodoListActivity::clampIndices() {
-  const int count = cycleEntryCount();
+int TodoListActivity::currentTaskCount(const CycleView& view) const {
+  if (isFavouritesEntry(cycleIndex, view)) return TODO_DATA.getFavouriteTaskCount();
+  const TodoList* list = listForCycleEntry(cycleIndex, view);
+  return list ? TODO_DATA.getTaskCountInList(list->id) : 0;
+}
+
+void TodoListActivity::clampIndices(const CycleView& view) {
+  const int count = cycleEntryCount(view);
   if (count <= 0) {
     cycleIndex = 0;
     taskCursor = 0;
     return;
   }
-  if (cycleIndex >= count) cycleIndex = count - 1;
-  if (cycleIndex < 0) cycleIndex = 0;
+  cycleIndex = std::clamp(cycleIndex, 0, count - 1);
 
-  const int taskCount = static_cast<int>(currentTaskIds().size());
-  if (taskCursor >= taskCount) taskCursor = std::max(0, taskCount - 1);
-  if (taskCursor < 0) taskCursor = 0;
+  const int taskCount = currentTaskCount(view);
+  taskCursor = taskCount > 0 ? std::clamp(taskCursor, 0, taskCount - 1) : 0;
 }
 
-void TodoListActivity::switchList(const int direction) {
-  const int count = cycleEntryCount();
+void TodoListActivity::switchList(const int direction, const CycleView& view) {
+  const int count = cycleEntryCount(view);
   if (count <= 1) return;
   cycleIndex = (cycleIndex + direction + count) % count;
   taskCursor = 0;
   requestUpdate();
 }
 
-void TodoListActivity::toggleCompleteAll() {
-  const auto ids = currentTaskIds();
+void TodoListActivity::toggleCompleteAll(const CycleView& view) {
+  const auto ids = currentTaskIds(view);
   if (ids.empty()) return;
 
-  if (hasCompleteAllSnapshot && completeAllSnapshotCycleIndex == cycleIndex) {
+  if (completeAllSnapshotCycleIndex == cycleIndex) {
     // Undo: restore the exact snapshot taken when complete-all was triggered,
     // regardless of any individual completions toggled since (Section 11).
     TODO_DATA.restoreCompleted(ids, completeAllSnapshot);
-    hasCompleteAllSnapshot = false;
+    completeAllSnapshotCycleIndex = -1;
   } else {
     completeAllSnapshot = TODO_DATA.snapshotCompleted(ids);
     completeAllSnapshotCycleIndex = cycleIndex;
-    hasCompleteAllSnapshot = true;
     TODO_DATA.setAllCompleted(ids, true);
   }
 }
 
-void TodoListActivity::loop() {
-  clampIndices();
+void TodoListActivity::onEnter() {
+  Activity::onEnter();
+  TodoLocalTime now;
+  if (getTodoLocalTime(now)) TODO_DATA.applyChecklistResets(now.dayKey);
+  requestUpdateAndWait();  // Draw immediately instead of waiting for the next input event.
+}
 
-  const int pressedButton = mappedInput.getPressedFrontButton();
-  // RL only for actions that push/pop an Activity (see TodoHomeActivity for
-  // why: firing on release avoids a stray release bleeding into whatever
-  // screen becomes current next). Complete/favourite/complete-all never
-  // transition activities, so they stay press-triggered for responsiveness.
-  const int releasedButton = mappedInput.getReleasedFrontButton();
+void TodoListActivity::loop() {
+  TodoLocalTime now;
+  const bool hasClock = getTodoLocalTime(now);
+  // Reset-and-drop (Section 6): a no-op for Todo-type lists and for
+  // checklists already reset today. Applied here (not in buildCycleView(),
+  // which only reads state) so it stays an explicit, once-per-pass step.
+  if (hasClock) TODO_DATA.applyChecklistResets(now.dayKey);
+  const CycleView view = buildCycleView(hasClock ? &now : nullptr);
+  clampIndices(view);
 
   if (menuBar.focused) {
-    if (pressedButton >= 0) {
-      const auto slot = todoRawButtonToSlot(pressedButton);
-      if (slot == TodoButtonSlot::LL || slot == TodoButtonSlot::LR) {
-        menuBar.handleSlot(slot);
+    switch (menuBar.processInput(mappedInput)) {
+      case TodoMenuBar::Action::ActivateBack:
+        finish();  // Returns to the Home screen (Section 5's hierarchical Back).
+        return;
+      case TodoMenuBar::Action::ActivateSync:
+      case TodoMenuBar::Action::ActivateSettings:
+        return;  // Not implemented yet.
+      case TodoMenuBar::Action::Consumed:
         requestUpdate();
         return;
-      }
+      case TodoMenuBar::Action::None:
+      default:
+        return;
     }
-    if (releasedButton >= 0 && todoRawButtonToSlot(releasedButton) == TodoButtonSlot::RL) {
-      switch (menuBar.handleSlot(TodoButtonSlot::RL)) {
-        case TodoMenuBar::Action::ActivateBack:
-          finish();  // Returns to the Home screen (Section 5's hierarchical Back).
-          return;
-        default:
-          return;  // Sync/Settings not implemented yet.
-      }
-    }
-    return;
   }
 
   // Side L/R: switch lists within this category. No-op while the menu bar is
   // focused (handled above), reserved exclusively for this otherwise (Section 5).
   if (mappedInput.wasPressed(MappedInputManager::Button::Up)) {
-    switchList(-1);
+    switchList(-1, view);
     return;
   }
   if (mappedInput.wasPressed(MappedInputManager::Button::Down)) {
-    switchList(1);
+    switchList(1, view);
     return;
   }
 
+  // Nothing below transitions to a different Activity, so every slot here is
+  // press-triggered (see TodoButtonMapping.h's todoConsumeSlot()).
+  const TodoButtonSlot slot = todoConsumeSlot(mappedInput);
+  if (slot == TodoButtonSlot::None) return;
+
   if (focus == Focus::ListNameRow) {
-    if (pressedButton < 0) return;
-    switch (todoRawButtonToSlot(pressedButton)) {
+    switch (slot) {
       case TodoButtonSlot::LL:  // up to the menu bar
         menuBar.enter();
         requestUpdate();
         return;
       case TodoButtonSlot::LR:  // down to the first task
-        if (!currentTaskIds().empty()) {
+        if (currentTaskCount(view) > 0) {
           focus = Focus::Tasks;
           taskCursor = 0;
           requestUpdate();
         }
         return;
       case TodoButtonSlot::RL:  // complete all / undo
-        toggleCompleteAll();
+        toggleCompleteAll(view);
         requestUpdate();
         return;
       case TodoButtonSlot::RR:  // show list info -- not implemented yet
-      case TodoButtonSlot::None:
       default:
         return;
     }
   }
 
   // Focus::Tasks
-  if (pressedButton < 0) return;
-  const auto ids = currentTaskIds();
-  switch (todoRawButtonToSlot(pressedButton)) {
+  const auto ids = currentTaskIds(view);
+  switch (slot) {
     case TodoButtonSlot::LL:  // cursor up, or back up to the list-name row from the first task
       if (taskCursor > 0) {
         taskCursor--;
@@ -176,13 +186,13 @@ void TodoListActivity::loop() {
         requestUpdate();
       }
       return;
-    case TodoButtonSlot::RR:  // favourite/unfavourite highlighted task
-      if (taskCursor >= 0 && taskCursor < static_cast<int>(ids.size())) {
+    case TodoButtonSlot::RR:  // favourite/unfavourite highlighted task -- Todo lists only (Section 6: the
+                              // Favourites filter is scoped to "all Todo lists"; no-op inside a Checklist)
+      if (listType == TodoListType::Todo && taskCursor >= 0 && taskCursor < static_cast<int>(ids.size())) {
         TODO_DATA.toggleFavourited(ids[taskCursor]);
         requestUpdate();
       }
       return;
-    case TodoButtonSlot::None:
     default:
       return;
   }
@@ -191,6 +201,10 @@ void TodoListActivity::loop() {
 void TodoListActivity::render(RenderLock&&) {
   renderer.clearScreen();
 
+  TodoLocalTime now;
+  const bool hasClock = getTodoLocalTime(now);
+  const CycleView view = buildCycleView(hasClock ? &now : nullptr);
+
   const auto& metrics = UITheme::getInstance().getMetrics();
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
@@ -198,28 +212,24 @@ void TodoListActivity::render(RenderLock&&) {
   const int contentLineHeight = renderer.getLineHeight(contentFontId);
 
   const int menuRowHeight = renderer.getLineHeight(UI_12_FONT_ID) + 16;
-  const int menuBarHeight = menuBar.rowCount() * menuRowHeight;
-  menuBar.render(renderer, 0, metrics.topPadding, pageWidth, menuRowHeight);
-
-  const int dividerY = metrics.topPadding + menuBarHeight + metrics.verticalSpacing / 2;
-  renderer.drawLine(metrics.contentSidePadding, dividerY, pageWidth - metrics.contentSidePadding, dividerY);
+  const int nameRowY = menuBar.renderAndGetContentTop(renderer, 0, metrics.topPadding, pageWidth, menuRowHeight);
 
   const int rowHeight = metrics.listRowHeight + metrics.verticalSpacing;
   const int textWidth = pageWidth - metrics.contentSidePadding * 2;
+  const int entryCount = cycleEntryCount(view);
 
   // List-name row.
-  const int nameRowY = dividerY + metrics.verticalSpacing;
   const bool nameRowSelected = !menuBar.focused && focus == Focus::ListNameRow;
   if (nameRowSelected) {
     renderer.fillRect(0, nameRowY, pageWidth, rowHeight);
   }
-  const std::string name = cycleEntryCount() > 0 ? cycleEntryName(cycleIndex) : "";
+  const std::string name = entryCount > 0 ? cycleEntryName(cycleIndex, view) : tr(STR_TODO_LIST_EMPTY);
   const auto truncatedName = renderer.truncatedText(contentFontId, name.c_str(), textWidth);
   renderer.drawText(contentFontId, metrics.contentSidePadding, nameRowY + (rowHeight - contentLineHeight) / 2,
                     truncatedName.c_str(), !nameRowSelected);
 
   // Task rows.
-  const auto ids = currentTaskIds();
+  const auto ids = entryCount > 0 ? currentTaskIds(view) : std::vector<int>{};
   const int tasksTop = nameRowY + rowHeight + metrics.verticalSpacing;
   for (int i = 0; i < static_cast<int>(ids.size()); i++) {
     const int rowY = tasksTop + i * rowHeight;

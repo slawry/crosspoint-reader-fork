@@ -16,15 +16,22 @@
 namespace {
 constexpr int kCategoryCount = TodoState::TODO_CATEGORY_COUNT;
 
-const char* categoryTitle(int index) {
-  switch (index) {
+// To Dos and Checklists share TodoListActivity (Section 5's "Inside a Todo or
+// Checklist list" is one interaction model), parameterized by which list type
+// to show. Habits still use the placeholder until their own logic is built.
+// New categories fail to compile here until handled, instead of silently
+// falling through an if/else chain that TodoHomeActivity would otherwise need
+// editing every time one more category graduates from placeholder to real logic.
+std::unique_ptr<Activity> createTodoCategoryScreen(GfxRenderer& renderer, MappedInputManager& mappedInput,
+                                                    const TodoState::TodoCategory category) {
+  switch (category) {
     case TodoState::TODO_CATEGORY_TODOS:
-      return tr(STR_TODO_CATEGORY_TODOS);
+      return std::make_unique<TodoListActivity>(renderer, mappedInput, TodoListType::Todo);
     case TodoState::TODO_CATEGORY_CHECKLISTS:
-      return tr(STR_TODO_CATEGORY_CHECKLISTS);
+      return std::make_unique<TodoListActivity>(renderer, mappedInput, TodoListType::Checklist);
     case TodoState::TODO_CATEGORY_HABITS:
     default:
-      return tr(STR_TODO_CATEGORY_HABITS);
+      return std::make_unique<TodoCategoryActivity>(renderer, mappedInput, category);
   }
 }
 }  // namespace
@@ -35,69 +42,50 @@ void TodoHomeActivity::onEnter() {
 }
 
 void TodoHomeActivity::loop() {
-  // LL/LR (cursor movement) fire on press for responsiveness. RL (activate) fires
-  // on release instead: activating can push/pop an Activity, and if that happened
-  // on press, the same physical button's still-pending release would land on
-  // whatever screen becomes current next -- which is exactly what caused Back to
-  // bounce straight back into this screen (the release bled into HomeActivity's
-  // own button handling right after the pop). Triggering on release means the
-  // press+release cycle is fully spent here first, so nothing is left over.
-  const int pressedButton = mappedInput.getPressedFrontButton();
-  const int releasedButton = mappedInput.getReleasedFrontButton();
-
   if (menuBar.focused) {
-    if (pressedButton >= 0) {
-      const auto slot = todoRawButtonToSlot(pressedButton);
-      if (slot == TodoButtonSlot::LL || slot == TodoButtonSlot::LR) {
-        menuBar.handleSlot(slot);
+    switch (menuBar.processInput(mappedInput)) {
+      case TodoMenuBar::Action::ActivateBack:
+        finish();  // Returns to whatever screen pushed this one (Section 5's hierarchical Back).
+        return;
+      case TodoMenuBar::Action::ActivateSync:
+      case TodoMenuBar::Action::ActivateSettings:
+        return;  // Not implemented yet (design-spec.md Sections 8/9).
+      case TodoMenuBar::Action::Consumed:
         requestUpdate();
         return;
-      }
-    }
-    if (releasedButton >= 0 && todoRawButtonToSlot(releasedButton) == TodoButtonSlot::RL) {
-      switch (menuBar.handleSlot(TodoButtonSlot::RL)) {
-        case TodoMenuBar::Action::ActivateBack:
-          finish();  // Returns to whatever screen pushed this one (Section 5's hierarchical Back).
-          return;
-        default:
-          return;  // Sync/Settings not implemented yet (design-spec.md Sections 8/9).
-      }
-    }
-    return;
-  }
-
-  if (pressedButton >= 0) {
-    switch (todoRawButtonToSlot(pressedButton)) {
-      case TodoButtonSlot::LL:  // up, or into the menu bar from the first item (Section 11)
-        if (selectorIndex > 0) {
-          selectorIndex--;
-        } else {
-          menuBar.enter();
-        }
-        requestUpdate();
-        return;
-      case TodoButtonSlot::LR:  // down
-        if (selectorIndex < kCategoryCount - 1) {
-          selectorIndex++;
-          requestUpdate();
-        }
-        return;
+      case TodoMenuBar::Action::None:
       default:
-        break;  // RL handled below via release; RR/None are no-ops (Section 5).
+        return;
     }
   }
 
-  if (releasedButton >= 0 && todoRawButtonToSlot(releasedButton) == TodoButtonSlot::RL) {
-    // Enter the highlighted category. Only "To Dos" has real logic so far;
-    // Checklists/Habits still use the empty placeholder until their own
-    // logic is built (docs/design-spec.md Section 10's integration plan).
-    const auto category = static_cast<TodoState::TodoCategory>(selectorIndex);
-    if (category == TodoState::TODO_CATEGORY_TODOS) {
-      startActivityForResult(std::make_unique<TodoListActivity>(renderer, mappedInput), [](const ActivityResult&) {});
-    } else {
-      startActivityForResult(std::make_unique<TodoCategoryActivity>(renderer, mappedInput, category),
-                             [](const ActivityResult&) {});
+  // "Enter category" pushes an Activity, so it's read on release, not press
+  // (see TodoButtonMapping.h's todoConsumeSlot() for why). LL/LR (cursor
+  // movement) don't transition, so they still resolve via press.
+  switch (todoConsumeSlot(mappedInput, TodoButtonSlot::RL)) {
+    case TodoButtonSlot::LL:  // up, or into the menu bar from the first item (Section 11)
+      if (selectorIndex > 0) {
+        selectorIndex--;
+      } else {
+        menuBar.enter();
+      }
+      requestUpdate();
+      return;
+    case TodoButtonSlot::LR:  // down
+      if (selectorIndex < kCategoryCount - 1) {
+        selectorIndex++;
+        requestUpdate();
+      }
+      return;
+    case TodoButtonSlot::RL: {  // enter highlighted category
+      const auto category = static_cast<TodoState::TodoCategory>(selectorIndex);
+      startActivityForResult(createTodoCategoryScreen(renderer, mappedInput, category), [](const ActivityResult&) {});
+      return;
     }
+    case TodoButtonSlot::RR:  // no-op (Section 5)
+    case TodoButtonSlot::None:
+    default:
+      return;
   }
 }
 
@@ -106,21 +94,15 @@ void TodoHomeActivity::render(RenderLock&&) {
 
   const auto& metrics = UITheme::getInstance().getMetrics();
   const auto pageWidth = renderer.getScreenWidth();
-  const auto pageHeight = renderer.getScreenHeight();
 
   // Menu bar rows are condensed (text height + a little padding) rather than the
   // theme's touch-target-sized menuRowHeight, which is meant for HomeActivity's
-  // own tap-friendly button menu. Font matches TodoMenuBar::render() (UI_12_FONT_ID).
+  // own tap-friendly button menu. Font matches TodoMenuBar's own row font.
   const int menuRowHeight = renderer.getLineHeight(UI_12_FONT_ID) + 16;
-  const int menuBarHeight = menuBar.rowCount() * menuRowHeight;
-  menuBar.render(renderer, 0, metrics.topPadding, pageWidth, menuRowHeight);
-
-  const int dividerY = metrics.topPadding + menuBarHeight + metrics.verticalSpacing / 2;
-  renderer.drawLine(metrics.contentSidePadding, dividerY, pageWidth - metrics.contentSidePadding, dividerY);
+  const int listTop = menuBar.renderAndGetContentTop(renderer, 0, metrics.topPadding, pageWidth, menuRowHeight);
 
   // Category rows get extra breathing room below the divider (listRowHeight plus
   // a full verticalSpacing gap, instead of sitting back-to-back).
-  const int listTop = dividerY + metrics.verticalSpacing;
   const int rowHeight = metrics.listRowHeight + metrics.verticalSpacing;
   // UI_12_FONT_ID is the largest built-in "UI" family size; NOTOSANS_16_FONT_ID
   // (already loaded globally, no new flash/heap cost) is the closest available
@@ -135,7 +117,7 @@ void TodoHomeActivity::render(RenderLock&&) {
       renderer.fillRect(0, rowY, pageWidth, rowHeight);
     }
     renderer.drawText(categoryFontId, metrics.contentSidePadding, rowY + (rowHeight - lineHeight) / 2,
-                      categoryTitle(i), !selected);
+                      todoCategoryTitle(static_cast<TodoState::TodoCategory>(i)), !selected);
   }
 
   renderer.displayBuffer();

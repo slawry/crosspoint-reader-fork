@@ -77,6 +77,10 @@ class MappedInputManager {
   const GfxRenderer& renderer;
 
   bool mapButton(Button button, bool (HalGPIO::*fn)(uint8_t) const) const;
+  // Scans the raw front buttons in hardware order for the first one matching
+  // fn (wasPressed/wasReleased), bypassing remapping. Shared by
+  // getPressedFrontButton()/getReleasedFrontButton().
+  int scanFrontButtons(bool (HalGPIO::*fn)(uint8_t) const) const;
   bool wasBackGesture() const;
   // Fetch the pending swipe (if any) and map both endpoints to logical screen coords
   bool decodeSwipe(int& sx, int& sy, int& ex, int& ey) const;

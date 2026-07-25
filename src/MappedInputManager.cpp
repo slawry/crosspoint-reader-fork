@@ -326,38 +326,17 @@ MappedInputManager::Labels MappedInputManager::mapLabels(const char* back, const
           labelForHardware(HalGPIO::BTN_LEFT), labelForHardware(HalGPIO::BTN_RIGHT)};
 }
 
-int MappedInputManager::getPressedFrontButton() const {
+int MappedInputManager::scanFrontButtons(bool (HalGPIO::*fn)(uint8_t) const) const {
   // Scan the raw front buttons in hardware order.
   // This bypasses remapping so the remap activity can capture physical presses.
-  if (gpio.wasPressed(HalGPIO::BTN_BACK)) {
-    return HalGPIO::BTN_BACK;
-  }
-  if (gpio.wasPressed(HalGPIO::BTN_CONFIRM)) {
-    return HalGPIO::BTN_CONFIRM;
-  }
-  if (gpio.wasPressed(HalGPIO::BTN_LEFT)) {
-    return HalGPIO::BTN_LEFT;
-  }
-  if (gpio.wasPressed(HalGPIO::BTN_RIGHT)) {
-    return HalGPIO::BTN_RIGHT;
+  static constexpr uint8_t kFrontButtons[4] = {HalGPIO::BTN_BACK, HalGPIO::BTN_CONFIRM, HalGPIO::BTN_LEFT,
+                                               HalGPIO::BTN_RIGHT};
+  for (const uint8_t button : kFrontButtons) {
+    if ((gpio.*fn)(button)) return button;
   }
   return -1;
 }
 
-int MappedInputManager::getReleasedFrontButton() const {
-  // Scan the raw front buttons in hardware order. Bypasses remapping, same as
-  // getPressedFrontButton().
-  if (gpio.wasReleased(HalGPIO::BTN_BACK)) {
-    return HalGPIO::BTN_BACK;
-  }
-  if (gpio.wasReleased(HalGPIO::BTN_CONFIRM)) {
-    return HalGPIO::BTN_CONFIRM;
-  }
-  if (gpio.wasReleased(HalGPIO::BTN_LEFT)) {
-    return HalGPIO::BTN_LEFT;
-  }
-  if (gpio.wasReleased(HalGPIO::BTN_RIGHT)) {
-    return HalGPIO::BTN_RIGHT;
-  }
-  return -1;
-}
+int MappedInputManager::getPressedFrontButton() const { return scanFrontButtons(&HalGPIO::wasPressed); }
+
+int MappedInputManager::getReleasedFrontButton() const { return scanFrontButtons(&HalGPIO::wasReleased); }

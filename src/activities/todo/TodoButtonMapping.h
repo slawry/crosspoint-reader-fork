@@ -1,5 +1,6 @@
 #pragma once
 #include "CrossPointSettings.h"
+#include "MappedInputManager.h"
 
 // Maps a raw front-button press (HalGPIO::BTN_BACK/CONFIRM/LEFT/RIGHT, i.e. LL/LR/RL/RR
 // in physical order as returned by MappedInputManager::getPressedFrontButton()) to one
@@ -19,4 +20,32 @@ inline TodoButtonSlot todoRawButtonToSlot(int rawButton) {
   const uint8_t* order =
       (SETTINGS.todoButtonLayout == CrossPointSettings::TODO_BTN_LAYOUT_SYSTEM) ? systemOrder : defaultOrder;
   return static_cast<TodoButtonSlot>(order[rawButton]);
+}
+
+// Returns the slot that fired this frame, or None.
+//
+// `transitioningSlot` (if any) is read from the button *release* edge; every
+// other slot is read from the *press* edge. This is the rule every Todo-app
+// screen must follow for any action that can push/pop an Activity: firing on
+// press lets the transition happen while the button is still physically
+// held, leaving its release still pending -- and that stray release then
+// lands on whatever screen becomes current next (see
+// MappedInputManager::getReleasedFrontButton()'s doc comment; this is
+// exactly what caused Back to bounce straight back into the screen it had
+// just exited). Actions that don't transition (cursor movement,
+// complete/favourite a task) stay press-triggered for responsiveness by
+// simply not naming themselves as `transitioningSlot`.
+inline TodoButtonSlot todoConsumeSlot(const MappedInputManager& mappedInput,
+                                       const TodoButtonSlot transitioningSlot = TodoButtonSlot::None) {
+  const int pressed = mappedInput.getPressedFrontButton();
+  if (pressed >= 0) {
+    const auto slot = todoRawButtonToSlot(pressed);
+    if (slot != transitioningSlot) return slot;
+  }
+  const int released = mappedInput.getReleasedFrontButton();
+  if (released >= 0) {
+    const auto slot = todoRawButtonToSlot(released);
+    if (slot == transitioningSlot) return slot;
+  }
+  return TodoButtonSlot::None;
 }

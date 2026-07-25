@@ -3,6 +3,7 @@
 #include <GfxRenderer.h>
 #include <I18n.h>
 
+#include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -10,14 +11,14 @@ TodoMenuBar::Action TodoMenuBar::handleSlot(const TodoButtonSlot slot) {
   switch (slot) {
     case TodoButtonSlot::LL:  // up: Back -> Sync -> Settings
       if (selectorIndex > ENTRY_SETTINGS) selectorIndex--;
-      return Action::None;
+      return Action::Consumed;
     case TodoButtonSlot::LR:  // down: Settings -> Sync -> Back, then out to the content below
       if (selectorIndex < ENTRY_BACK) {
         selectorIndex++;
-        return Action::None;
+      } else {
+        focused = false;
       }
-      focused = false;
-      return Action::ExitToContent;
+      return Action::Consumed;
     case TodoButtonSlot::RL:  // activate highlighted entry
       switch (selectorIndex) {
         case ENTRY_BACK:
@@ -35,13 +36,19 @@ TodoMenuBar::Action TodoMenuBar::handleSlot(const TodoButtonSlot slot) {
   }
 }
 
-void TodoMenuBar::render(const GfxRenderer& renderer, const int x, const int y, const int width,
-                         const int rowHeight) const {
+TodoMenuBar::Action TodoMenuBar::processInput(const MappedInputManager& mappedInput) {
+  const TodoButtonSlot slot = todoConsumeSlot(mappedInput, TodoButtonSlot::RL);
+  if (slot == TodoButtonSlot::None) return Action::None;
+  return handleSlot(slot);
+}
+
+int TodoMenuBar::renderAndGetContentTop(const GfxRenderer& renderer, const int x, const int y, const int width,
+                                        const int rowHeight) const {
   const auto& metrics = UITheme::getInstance().getMetrics();
+
   // When collapsed, only Back is drawn, at the row position it occupies when
   // expanded (immediately above the divider/content).
   const int firstEntry = focused ? ENTRY_SETTINGS : ENTRY_BACK;
-
   for (int entry = firstEntry; entry < ENTRY_COUNT; entry++) {
     const int row = entry - firstEntry;
     const int rowY = y + row * rowHeight;
@@ -55,4 +62,8 @@ void TodoMenuBar::render(const GfxRenderer& renderer, const int x, const int y, 
     renderer.drawText(UI_12_FONT_ID, x + metrics.contentSidePadding,
                       rowY + (rowHeight - renderer.getLineHeight(UI_12_FONT_ID)) / 2, label, !selected);
   }
+
+  const int dividerY = y + rowCount() * rowHeight + metrics.verticalSpacing / 2;
+  renderer.drawLine(x + metrics.contentSidePadding, dividerY, x + width - metrics.contentSidePadding, dividerY);
+  return dividerY + metrics.verticalSpacing;
 }
