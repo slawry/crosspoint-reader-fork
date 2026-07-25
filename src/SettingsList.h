@@ -265,6 +265,11 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                           {StrId::STR_FMT_AUTHOR_TITLE, StrId::STR_FMT_TITLE_AUTHOR, StrId::STR_FMT_TITLE},
                           "opdsFilenameFormat"),
 
+        // Todo app button layout: persisted + web-exposed, category-less so it stays off the
+        // on-device Settings screen until the Todo app has its own settings UI.
+        SettingInfo::Enum(StrId::STR_TODO_BUTTON_LAYOUT, &CrossPointSettings::todoButtonLayout,
+                          {StrId::STR_DEFAULT_VALUE, StrId::STR_TODO_LAYOUT_SYSTEM}, "todoButtonLayout"),
+
         // --- KOReader Sync (web-only, uses KOReaderCredentialStore) ---
         SettingInfo::DynamicString(
             StrId::STR_KOREADER_USERNAME, [] { return KOREADER_STORE.getUsername(); },

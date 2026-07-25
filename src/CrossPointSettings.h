@@ -85,6 +85,11 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Default: Up = Previous, Down = Next
   enum SIDE_BUTTON_LAYOUT { PREV_NEXT = 0, NEXT_PREV = 1, SIDE_BUTTONS_DISABLED = 2, SIDE_BUTTON_LAYOUT_COUNT };
 
+  // Todo app button layout options
+  // Default: left rocker navigates up/down; right rocker selects/completes and favourites/shows info
+  // System:  left rocker selects/completes and favourites/shows info; right rocker navigates up/down
+  enum TODO_BUTTON_LAYOUT { TODO_BTN_LAYOUT_DEFAULT = 0, TODO_BTN_LAYOUT_SYSTEM = 1, TODO_BUTTON_LAYOUT_COUNT };
+
   // Font family options (built-in fonts only; SD card fonts use sdFontFamilyName)
   enum FONT_FAMILY { NOTOSERIF = 0, NOTOSANS = 1, FONT_FAMILY_COUNT };
   static constexpr uint8_t LEGACY_OPENDYSLEXIC = 2;
@@ -199,6 +204,8 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Button layouts (front layout retained for migration only)
   uint8_t frontButtonLayout = BACK_CONFIRM_LEFT_RIGHT;
   uint8_t sideButtonLayout = PREV_NEXT;
+  // Todo app button layout (see TODO_BUTTON_LAYOUT). Not yet wired to any screen.
+  uint8_t todoButtonLayout = TODO_BTN_LAYOUT_DEFAULT;
   uint8_t frontButtonFollowOrientation = 0;
   // Front button remap (logical -> hardware)
   // Used by MappedInputManager to translate logical buttons into physical front buttons.

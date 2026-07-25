@@ -29,6 +29,8 @@
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
 #include "activities/settings/SdFirmwareUpdateActivity.h"
+#include "activities/todo/TodoSeedData.h"
+#include "activities/todo/TodoState.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "images/LoadingIcon.h"
@@ -312,6 +314,10 @@ void setup() {
   I18N.setLanguage(static_cast<Language>(SETTINGS.language));
   KOREADER_STORE.loadFromFile();
   OPDS_STORE.loadFromFile();
+  TODO_STATE.loadFromFile();
+#if TODO_SEED_DEBUG_DATA
+  seedTodoDebugData();  // TEMPORARY: remove once BLE sync populates real data (see TodoSeedData.h)
+#endif
   UITheme::getInstance().reload();
   ButtonNavigator::setMappedInputManager(mappedInputManager);
 

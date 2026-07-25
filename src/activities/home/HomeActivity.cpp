@@ -10,6 +10,7 @@
 #include <Xtc.h>
 
 #include <cstring>
+#include <memory>
 #include <vector>
 
 #include "CrossPointSettings.h"
@@ -19,6 +20,7 @@
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "activities/todo/TodoHomeActivity.h"
 
 int HomeActivity::getMenuItemCount() const {
   int count = 4;  // File Browser, Recents, File transfer, Settings
@@ -348,6 +350,13 @@ void HomeActivity::onRecentsOpen() { activityManager.goToRecentBooks(); }
 
 void HomeActivity::onSettingsOpen() { activityManager.goToSettings(); }
 
-void HomeActivity::onFileTransferOpen() { activityManager.goToFileTransfer(); }
+// TEMPORARY: repointed to the Todo app's Home screen for device testing.
+// Pushed (not replaceActivity()) so its Back returns to this screen, matching
+// docs/design-spec.md's "E-reader book view -> Home screen" hierarchy once the
+// real entry point (from inside the reader) replaces this temporary hook.
+// Restore to activityManager.goToFileTransfer() before this wiring is replaced with real navigation.
+void HomeActivity::onFileTransferOpen() {
+  startActivityForResult(std::make_unique<TodoHomeActivity>(renderer, mappedInput), [](const ActivityResult&) {});
+}
 
 void HomeActivity::onOpdsBrowserOpen() { activityManager.goToBrowser(); }

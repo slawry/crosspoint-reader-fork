@@ -54,6 +54,12 @@ class MappedInputManager {
   Labels mapLabels(const char* back, const char* confirm, const char* previous, const char* next) const;
   // Returns the raw front button index that was pressed this frame (or -1 if none).
   int getPressedFrontButton() const;
+  // Returns the raw front button index that was released this frame (or -1 if none).
+  // Useful for "activate" actions that can cause a screen transition: triggering on
+  // release (not press) ensures the button's press+release cycle is fully consumed
+  // before the transition happens, so the newly-current screen never sees a stray
+  // leftover release event from the same physical press.
+  int getReleasedFrontButton() const;
 
   // True when the control axis is flipped relative to the physical buttons: the user opted into
   // orientation-following front buttons AND the screen is *currently rendered* rotated (INVERTED /
