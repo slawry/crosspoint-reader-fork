@@ -20,10 +20,9 @@
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
-#include "activities/todo/TodoHomeActivity.h"
 
 int HomeActivity::getMenuItemCount() const {
-  int count = 4;  // File Browser, Recents, File transfer, Settings
+  int count = 5;  // To Do, File Browser, Recents, File transfer, Settings
   if (!recentBooks.empty()) {
     count += recentBooks.size();
   }
@@ -179,6 +178,9 @@ void HomeActivity::loop() {
     }
     const int menuIndex = selectorIndex - static_cast<int>(recentBooks.size());
     switch (indexToMenuItem(menuIndex, hasOpdsServers)) {
+      case HomeMenuItem::TODO_APP:
+        onTodoOpen();
+        break;
       case HomeMenuItem::FILE_BROWSER:
         onFileBrowserOpen();
         break;
@@ -302,13 +304,13 @@ void HomeActivity::render(RenderLock&&) {
                           std::bind(&HomeActivity::storeCoverBuffer, this));
 
   // Build menu items dynamically
-  std::vector<const char*> menuItems = {tr(STR_BROWSE_FILES), tr(STR_MENU_RECENT_BOOKS), tr(STR_FILE_TRANSFER),
-                                        tr(STR_SETTINGS_TITLE)};
-  std::vector<UIIcon> menuIcons = {Folder, Recent, Transfer, Settings};
+  std::vector<const char*> menuItems = {tr(STR_HOME_MENU_TODO), tr(STR_BROWSE_FILES), tr(STR_MENU_RECENT_BOOKS),
+                                        tr(STR_FILE_TRANSFER), tr(STR_SETTINGS_TITLE)};
+  std::vector<UIIcon> menuIcons = {Bookmark, Folder, Recent, Transfer, Settings};
 
   if (hasOpdsServers) {
-    menuItems.insert(menuItems.begin() + 2, tr(STR_OPDS_BROWSER));
-    menuIcons.insert(menuIcons.begin() + 2, Library);
+    menuItems.insert(menuItems.begin() + 3, tr(STR_OPDS_BROWSER));
+    menuIcons.insert(menuIcons.begin() + 3, Library);
   }
 
   if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
@@ -350,13 +352,8 @@ void HomeActivity::onRecentsOpen() { activityManager.goToRecentBooks(); }
 
 void HomeActivity::onSettingsOpen() { activityManager.goToSettings(); }
 
-// TEMPORARY: repointed to the Todo app's Home screen for device testing.
-// Pushed (not replaceActivity()) so its Back returns to this screen, matching
-// docs/design-spec.md's "E-reader book view -> Home screen" hierarchy once the
-// real entry point (from inside the reader) replaces this temporary hook.
-// Restore to activityManager.goToFileTransfer() before this wiring is replaced with real navigation.
-void HomeActivity::onFileTransferOpen() {
-  startActivityForResult(std::make_unique<TodoHomeActivity>(renderer, mappedInput), [](const ActivityResult&) {});
-}
+void HomeActivity::onFileTransferOpen() { activityManager.goToFileTransfer(); }
+
+void HomeActivity::onTodoOpen() { activityManager.goToTodo(); }
 
 void HomeActivity::onOpdsBrowserOpen() { activityManager.goToBrowser(); }

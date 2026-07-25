@@ -40,6 +40,12 @@ class TodoMenuBar {
   // Returns the y coordinate the host's own content should start at.
   int renderAndGetContentTop(const GfxRenderer& renderer, int x, int y, int width, int rowHeight) const;
 
+  // Button-hint labels (LL/LR/RL/RR, Default order) for the bar's current state.
+  // Host screens use this instead of their own hints whenever `focused` is true --
+  // see TodoButtonMapping.h's todoButtonHints() for turning this into raw physical
+  // order for GUI.drawButtonHints().
+  TodoButtonHints hintLabels() const;
+
  private:
   // Handles a single button slot while the bar has focus.
   Action handleSlot(TodoButtonSlot slot);

@@ -56,6 +56,20 @@ void seedTodoDebugData() {
   TODO_DATA.addTask(deepClean, "Vacuum");
   TODO_DATA.addTask(deepClean, "Bathroom");
   TODO_DATA.addTask(deepClean, "Kitchen");
+
+  // Habits: one sample per mode x direction combination (design-spec.md Section 6),
+  // so both the weekly rollup and the weekly info modal's on-track/off-track status
+  // can be exercised for every combination. Targets are set a little below a
+  // typical week's activity so the seeded data reads as "in progress" rather than
+  // already complete either way.
+  const int wellness = TODO_DATA.addHabitList("Wellness");
+  TODO_DATA.addHabit(wellness, "Meditate", HabitMode::Boolean, HabitDirection::Build, 5 /* days out of 7 */);
+  TODO_DATA.addHabit(wellness, "No Late Snacking", HabitMode::Boolean, HabitDirection::Break,
+                     2 /* max slip-days out of 7 */);
+  TODO_DATA.addHabit(wellness, "Water (glasses)", HabitMode::Quantity, HabitDirection::Build,
+                     50 /* weekly total target */);
+  TODO_DATA.addHabit(wellness, "Over Screen Time Limit", HabitMode::Quantity, HabitDirection::Break,
+                     3 /* max weekly occurrences */);
 }
 
 #endif

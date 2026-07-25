@@ -159,14 +159,19 @@ void BaseTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
   renderer.setOrientation(GfxRenderer::Orientation::Portrait);
 
   const int pageHeight = renderer.getScreenHeight();
-  constexpr int buttonWidth = 106;
   constexpr int buttonHeight = BaseMetrics::values.buttonHintsHeight;
   constexpr int buttonY = BaseMetrics::values.buttonHintsHeight;  // Distance from bottom
   constexpr int textYOffset = 7;                                  // Distance from top of button to text baseline
-  // X3 has wider screen in portrait (528 vs 480), use more spacing
+  // X3 has wider screen in portrait (528 vs 480), use more spacing and, since there's
+  // more room to spare, a button 3px wider each side than X4's (positions shifted left
+  // by 3 to match, keeping each button's center in place).
+  constexpr int x4ButtonWidth = 106;
+  constexpr int x3ButtonWidth = 112;
   constexpr int x4ButtonPositions[] = {25, 130, 245, 350};
-  constexpr int x3ButtonPositions[] = {38, 154, 268, 384};
-  const int* buttonPositions = gpio.deviceIsX3() ? x3ButtonPositions : x4ButtonPositions;
+  constexpr int x3ButtonPositions[] = {35, 151, 265, 381};
+  const bool isX3 = gpio.deviceIsX3();
+  const int buttonWidth = isX3 ? x3ButtonWidth : x4ButtonWidth;
+  const int* buttonPositions = isX3 ? x3ButtonPositions : x4ButtonPositions;
   const char* labels[] = {btn1, btn2, btn3, btn4};
 
   for (int i = 0; i < 4; i++) {

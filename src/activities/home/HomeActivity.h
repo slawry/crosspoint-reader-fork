@@ -36,21 +36,27 @@ class HomeActivity final : public Activity {
   // Convert HomeMenuItem to menu index (used in onEnter)
   static int menuItemToIndex(HomeMenuItem item, bool hasOpdsUrl) {
     int i = 0;
+    if (item == HomeMenuItem::TODO_APP) return i;
+    ++i;
+    // NONE (generic/cold entry) and any unmatched item fall through to this index --
+    // Browse Files is the default selection, same as before To Do was added at index 0.
+    const int fileBrowserIndex = i;
     if (item == HomeMenuItem::FILE_BROWSER) return i;
     ++i;
     if (item == HomeMenuItem::RECENTS) return i;
     ++i;
-    if (item == HomeMenuItem::OPDS_BROWSER) return hasOpdsUrl ? i : 0;
+    if (item == HomeMenuItem::OPDS_BROWSER) return hasOpdsUrl ? i : fileBrowserIndex;
     if (hasOpdsUrl) ++i;
     if (item == HomeMenuItem::FILE_TRANSFER) return i;
     ++i;
     if (item == HomeMenuItem::SETTINGS_MENU) return i;
-    return 0;
+    return fileBrowserIndex;
   }
 
   // Convert menu index to HomeMenuItem (used in loop)
   static HomeMenuItem indexToMenuItem(int idx, bool hasOpdsUrl) {
     int i = 0;
+    if (idx == i++) return HomeMenuItem::TODO_APP;
     if (idx == i++) return HomeMenuItem::FILE_BROWSER;
     if (idx == i++) return HomeMenuItem::RECENTS;
     if (hasOpdsUrl && idx == i++) return HomeMenuItem::OPDS_BROWSER;
@@ -64,6 +70,7 @@ class HomeActivity final : public Activity {
   void onSettingsOpen();
   void onFileTransferOpen();
   void onOpdsBrowserOpen();
+  void onTodoOpen();
 
   int getMenuItemCount() const;
   bool storeCoverBuffer();    // Store frame buffer for cover image

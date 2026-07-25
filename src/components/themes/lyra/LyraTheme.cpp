@@ -356,15 +356,20 @@ void LyraTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
   renderer.setOrientation(GfxRenderer::Orientation::Portrait);
 
   const int pageHeight = renderer.getScreenHeight();
-  constexpr int buttonWidth = 80;
   constexpr int smallButtonHeight = 15;
   constexpr int buttonHeight = LyraMetrics::values.buttonHintsHeight;
   constexpr int buttonY = LyraMetrics::values.buttonHintsHeight;  // Distance from bottom
   constexpr int textYOffset = 7;                                  // Distance from top of button to text baseline
-  // X3 has wider screen in portrait (528 vs 480), use more spacing
+  // X3 has wider screen in portrait (528 vs 480), use more spacing and, since there's
+  // more room to spare, a button 3px wider each side than X4's (positions shifted left
+  // by 3 to match, keeping each button's center in place).
+  constexpr int x4ButtonWidth = 80;
+  constexpr int x3ButtonWidth = 86;
   constexpr int x4ButtonPositions[] = {58, 146, 254, 342};
-  constexpr int x3ButtonPositions[] = {65, 157, 291, 383};
-  const int* buttonPositions = gpio.deviceIsX3() ? x3ButtonPositions : x4ButtonPositions;
+  constexpr int x3ButtonPositions[] = {62, 154, 288, 380};
+  const bool isX3 = gpio.deviceIsX3();
+  const int buttonWidth = isX3 ? x3ButtonWidth : x4ButtonWidth;
+  const int* buttonPositions = isX3 ? x3ButtonPositions : x4ButtonPositions;
   const char* labels[] = {btn1, btn2, btn3, btn4};
 
   for (int i = 0; i < 4; i++) {

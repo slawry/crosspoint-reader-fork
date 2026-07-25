@@ -90,6 +90,10 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // System:  left rocker selects/completes and favourites/shows info; right rocker navigates up/down
   enum TODO_BUTTON_LAYOUT { TODO_BTN_LAYOUT_DEFAULT = 0, TODO_BTN_LAYOUT_SYSTEM = 1, TODO_BUTTON_LAYOUT_COUNT };
 
+  // Habit week-start day (design-spec.md Section 6/11: "week start day: configurable in Settings",
+  // default Monday). Only affects how a habit's 7-day log aligns to calendar weeks.
+  enum HABIT_WEEK_START { HABIT_WEEK_START_MONDAY = 0, HABIT_WEEK_START_SUNDAY = 1, HABIT_WEEK_START_COUNT };
+
   // Font family options (built-in fonts only; SD card fonts use sdFontFamilyName)
   enum FONT_FAMILY { NOTOSERIF = 0, NOTOSANS = 1, FONT_FAMILY_COUNT };
   static constexpr uint8_t LEGACY_OPENDYSLEXIC = 2;
@@ -206,6 +210,8 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t sideButtonLayout = PREV_NEXT;
   // Todo app button layout (see TODO_BUTTON_LAYOUT). Not yet wired to any screen.
   uint8_t todoButtonLayout = TODO_BTN_LAYOUT_DEFAULT;
+  // Habit week-start day (see HABIT_WEEK_START). Not yet wired to any screen.
+  uint8_t todoHabitWeekStart = HABIT_WEEK_START_MONDAY;
   uint8_t frontButtonFollowOrientation = 0;
   // Front button remap (logical -> hardware)
   // Used by MappedInputManager to translate logical buttons into physical front buttons.

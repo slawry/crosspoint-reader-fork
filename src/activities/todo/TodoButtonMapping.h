@@ -49,3 +49,25 @@ inline TodoButtonSlot todoConsumeSlot(const MappedInputManager& mappedInput,
   }
   return TodoButtonSlot::None;
 }
+
+// Four button-hint labels, one per raw physical button, in the left-to-right order
+// GUI.drawButtonHints() renders them (see BaseTheme::drawButtonHints() and
+// MappedInputManager::getPressedFrontButton()'s raw hardware ordering).
+struct TodoButtonHints {
+  const char* raw[4];
+};
+
+// Reorders four labels given in logical-slot (Default) order -- LL, LR, RL, RR -- into
+// raw physical order, honoring the Default/System layout the same way
+// todoRawButtonToSlot() does. Pass "" for a slot that does nothing in the caller's
+// current state; GUI.drawButtonHints() hides empty labels. Every Todo-app screen
+// should recompute this every render() pass, since which label applies to which slot
+// changes as focus moves (list-name row vs. tasks, menu bar vs. not, etc.).
+inline TodoButtonHints todoButtonHints(const char* ll, const char* lr, const char* rl, const char* rr) {
+  const char* bySlot[4] = {ll, lr, rl, rr};
+  TodoButtonHints hints;
+  for (int raw = 0; raw < 4; raw++) {
+    hints.raw[raw] = bySlot[static_cast<uint8_t>(todoRawButtonToSlot(raw))];
+  }
+  return hints;
+}

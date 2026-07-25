@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 
+#include "HabitListActivity.h"
 #include "MappedInputManager.h"
 #include "TodoButtonMapping.h"
 #include "TodoCategoryActivity.h"
@@ -18,10 +19,11 @@ constexpr int kCategoryCount = TodoState::TODO_CATEGORY_COUNT;
 
 // To Dos and Checklists share TodoListActivity (Section 5's "Inside a Todo or
 // Checklist list" is one interaction model), parameterized by which list type
-// to show. Habits still use the placeholder until their own logic is built.
-// New categories fail to compile here until handled, instead of silently
-// falling through an if/else chain that TodoHomeActivity would otherwise need
-// editing every time one more category graduates from placeholder to real logic.
+// to show. Habits have their own screen (HabitListActivity) since their
+// item-row interaction is unrelated to complete/favourite. New categories fail
+// to compile here until handled, instead of silently falling through an
+// if/else chain that TodoHomeActivity would otherwise need editing every time
+// one more category graduates from placeholder to real logic.
 std::unique_ptr<Activity> createTodoCategoryScreen(GfxRenderer& renderer, MappedInputManager& mappedInput,
                                                     const TodoState::TodoCategory category) {
   switch (category) {
@@ -30,6 +32,7 @@ std::unique_ptr<Activity> createTodoCategoryScreen(GfxRenderer& renderer, Mapped
     case TodoState::TODO_CATEGORY_CHECKLISTS:
       return std::make_unique<TodoListActivity>(renderer, mappedInput, TodoListType::Checklist);
     case TodoState::TODO_CATEGORY_HABITS:
+      return std::make_unique<HabitListActivity>(renderer, mappedInput);
     default:
       return std::make_unique<TodoCategoryActivity>(renderer, mappedInput, category);
   }
@@ -119,6 +122,13 @@ void TodoHomeActivity::render(RenderLock&&) {
     renderer.drawText(categoryFontId, metrics.contentSidePadding, rowY + (rowHeight - lineHeight) / 2,
                       todoCategoryTitle(static_cast<TodoState::TodoCategory>(i)), !selected);
   }
+
+  // Section 5: LL/LR are cursor up/down (LL doubles as "into the menu bar" at the
+  // first item), RL enters the highlighted category, RR is a no-op on this screen.
+  const char* ll = selectorIndex > 0 ? tr(STR_DIR_UP) : tr(STR_TODO_HINT_MENU);
+  const char* lr = selectorIndex < kCategoryCount - 1 ? tr(STR_DIR_DOWN) : "";
+  const auto hints = menuBar.focused ? menuBar.hintLabels() : todoButtonHints(ll, lr, tr(STR_SELECT), "");
+  GUI.drawButtonHints(renderer, hints.raw[0], hints.raw[1], hints.raw[2], hints.raw[3]);
 
   renderer.displayBuffer();
 }

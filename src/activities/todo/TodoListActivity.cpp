@@ -198,6 +198,27 @@ void TodoListActivity::loop() {
   }
 }
 
+TodoButtonHints TodoListActivity::buttonHints(const CycleView& view, const std::vector<int>& ids) const {
+  if (focus == Focus::ListNameRow) {
+    const char* lr = currentTaskCount(view) > 0 ? tr(STR_DIR_DOWN) : "";
+    const char* rl =
+        ids.empty() ? "" : (completeAllSnapshotCycleIndex == cycleIndex ? tr(STR_TODO_HINT_UNDO)
+                                                                        : tr(STR_TODO_HINT_COMPLETE));
+    return todoButtonHints(tr(STR_TODO_HINT_MENU), lr, rl, "");
+  }
+
+  // Focus::Tasks
+  const bool hasSelection = taskCursor >= 0 && taskCursor < static_cast<int>(ids.size());
+  const auto* task = hasSelection ? TODO_DATA.getTask(ids[taskCursor]) : nullptr;
+  const char* lr = taskCursor < static_cast<int>(ids.size()) - 1 ? tr(STR_DIR_DOWN) : "";
+  const char* rl = task ? (task->completed ? tr(STR_TODO_HINT_UNCOMPLETE) : tr(STR_TODO_HINT_COMPLETE)) : "";
+  // RR (favourite/unfavourite) is Todo-only, matching the toggleFavourited() gate in loop().
+  const char* rr = (listType == TodoListType::Todo && task)
+                       ? (task->favourited ? tr(STR_TODO_HINT_UNFAVOURITE) : tr(STR_TODO_HINT_FAVOURITE))
+                       : "";
+  return todoButtonHints(tr(STR_DIR_UP), lr, rl, rr);
+}
+
 void TodoListActivity::render(RenderLock&&) {
   renderer.clearScreen();
 
@@ -249,6 +270,9 @@ void TodoListActivity::render(RenderLock&&) {
     renderer.drawText(contentFontId, metrics.contentSidePadding, rowY + (rowHeight - contentLineHeight) / 2,
                       truncated.c_str(), !selected);
   }
+
+  const auto hints = menuBar.focused ? menuBar.hintLabels() : buttonHints(view, ids);
+  GUI.drawButtonHints(renderer, hints.raw[0], hints.raw[1], hints.raw[2], hints.raw[3]);
 
   renderer.displayBuffer();
 }

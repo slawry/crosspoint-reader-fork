@@ -10,6 +10,16 @@ HalClock halClock;  // Singleton instance
 void HalClock::begin() {
   _available = _sdkRtc.begin();
   LOG_INF("CLK", _available ? "SDK RTC found" : "RTC not found");
+
+  if (_available) {
+    Rtc::DateTime dt;
+    if (getDateTime(dt)) {
+      LOG_INF("CLK", "RTC reports %04u-%02u-%02u %02u:%02u:%02u UTC (weekday %u)", dt.year, dt.month, dt.day,
+              dt.hour, dt.minute, dt.second, dt.weekday);
+    } else {
+      LOG_ERR("CLK", "RTC present but getDateTime() failed");
+    }
+  }
 }
 
 bool HalClock::getDateTime(Rtc::DateTime& out) const {

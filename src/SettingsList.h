@@ -270,6 +270,11 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
         SettingInfo::Enum(StrId::STR_TODO_BUTTON_LAYOUT, &CrossPointSettings::todoButtonLayout,
                           {StrId::STR_DEFAULT_VALUE, StrId::STR_TODO_LAYOUT_SYSTEM}, "todoButtonLayout"),
 
+        // Habit week-start day: persisted + web-exposed, category-less so it stays off the
+        // on-device Settings screen until the Todo app has its own settings UI.
+        SettingInfo::Enum(StrId::STR_TODO_HABIT_WEEK_START, &CrossPointSettings::todoHabitWeekStart,
+                          {StrId::STR_MONDAY, StrId::STR_SUNDAY}, "todoHabitWeekStart"),
+
         // --- KOReader Sync (web-only, uses KOReaderCredentialStore) ---
         SettingInfo::DynamicString(
             StrId::STR_KOREADER_USERNAME, [] { return KOREADER_STORE.getUsername(); },

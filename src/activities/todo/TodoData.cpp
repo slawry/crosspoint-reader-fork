@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include "CrossPointSettings.h"
+
 int TodoDataStore::addList(const std::string& name) {
   const int id = nextListId++;
   TodoList list;
@@ -27,6 +29,16 @@ int TodoDataStore::addChecklist(const std::string& name, const ChecklistFrequenc
   list.windowStartMinute = windowStartMinute;
   list.windowEndHour = windowEndHour;
   list.windowEndMinute = windowEndMinute;
+  lists.push_back(std::move(list));
+  return id;
+}
+
+int TodoDataStore::addHabitList(const std::string& name) {
+  const int id = nextListId++;
+  TodoList list;
+  list.id = id;
+  list.name = name;
+  list.type = TodoListType::Habit;
   lists.push_back(std::move(list));
   return id;
 }
@@ -87,11 +99,27 @@ int TodoDataStore::addTask(const int listId, const std::string& title, const boo
   return id;
 }
 
+int TodoDataStore::addHabit(const int listId, const std::string& name, const HabitMode mode,
+                            const HabitDirection direction, const int32_t target) {
+  const int id = nextHabitId++;
+  Habit habit;
+  habit.id = id;
+  habit.name = name;
+  habit.listId = listId;
+  habit.mode = mode;
+  habit.direction = direction;
+  habit.target = target;
+  habits.push_back(std::move(habit));
+  return id;
+}
+
 void TodoDataStore::clear() {
   lists.clear();
   tasks.clear();
+  habits.clear();
   nextListId = 1;
   nextTaskId = 1;
+  nextHabitId = 1;
 }
 
 std::vector<int> TodoDataStore::getTaskIdsInList(const int listId) const {
@@ -132,6 +160,70 @@ TodoTask* TodoDataStore::getTask(const int taskId) {
 const TodoTask* TodoDataStore::getTask(const int taskId) const {
   const auto it = std::find_if(tasks.begin(), tasks.end(), [taskId](const TodoTask& task) { return task.id == taskId; });
   return it != tasks.end() ? &*it : nullptr;
+}
+
+std::vector<int> TodoDataStore::getHabitIdsInList(const int listId) const {
+  std::vector<int> ids;
+  ids.reserve(habits.size());
+  for (const auto& habit : habits) {
+    if (habit.listId == listId) ids.push_back(habit.id);
+  }
+  return ids;
+}
+
+int TodoDataStore::getHabitCountInList(const int listId) const {
+  return static_cast<int>(std::count_if(habits.begin(), habits.end(),
+                                        [listId](const Habit& habit) { return habit.listId == listId; }));
+}
+
+Habit* TodoDataStore::getHabit(const int habitId) {
+  return const_cast<Habit*>(static_cast<const TodoDataStore*>(this)->getHabit(habitId));
+}
+
+const Habit* TodoDataStore::getHabit(const int habitId) const {
+  const auto it = std::find_if(habits.begin(), habits.end(), [habitId](const Habit& habit) { return habit.id == habitId; });
+  return it != habits.end() ? &*it : nullptr;
+}
+
+void TodoDataStore::applyHabitRollovers(const TodoLocalTime& now) {
+  // Week-start weekday per TodoLocalTime::weekday's convention (0=Sunday..6=Saturday).
+  const uint8_t weekStartWeekday = (SETTINGS.todoHabitWeekStart == CrossPointSettings::HABIT_WEEK_START_SUNDAY) ? 0 : 1;
+  const int32_t offsetFromWeekStart = (static_cast<int32_t>(now.weekday) - weekStartWeekday + 7) % 7;
+  const int32_t currentWeekStartDayKey = now.dayKey - offsetFromWeekStart;
+
+  for (auto& habit : habits) {
+    if (habit.weekStartDayKey == currentWeekStartDayKey) continue;
+    for (auto& day : habit.days) day = HabitDayEntry{};
+    habit.weekStartDayKey = currentWeekStartDayKey;
+  }
+}
+
+void TodoDataStore::logHabitToday(const int habitId, const TodoLocalTime& now) {
+  auto* habit = getHabit(habitId);
+  if (!habit) return;
+  const int32_t offset = now.dayKey - habit->weekStartDayKey;
+  if (offset < 0 || offset > 6) return;  // applyHabitRollovers(now) wasn't called first.
+
+  auto& day = habit->days[offset];
+  if (habit->mode == HabitMode::Boolean) {
+    day.completed = !day.completed;
+  } else {
+    day.count++;
+  }
+}
+
+const HabitDayEntry* TodoDataStore::getHabitTodayEntry(const Habit& habit, const TodoLocalTime& now) const {
+  const int32_t offset = now.dayKey - habit.weekStartDayKey;
+  if (offset < 0 || offset > 6) return nullptr;
+  return &habit.days[offset];
+}
+
+int32_t TodoDataStore::getHabitWeeklyTally(const Habit& habit) const {
+  int32_t tally = 0;
+  for (const auto& day : habit.days) {
+    tally += habit.mode == HabitMode::Boolean ? (day.completed ? 1 : 0) : day.count;
+  }
+  return tally;
 }
 
 void TodoDataStore::toggleCompleted(const int taskId) {

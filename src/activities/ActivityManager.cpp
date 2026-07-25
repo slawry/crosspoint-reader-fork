@@ -17,6 +17,7 @@
 #include "reader/ReaderActivity.h"
 #include "settings/OpdsServerListActivity.h"
 #include "settings/SettingsActivity.h"
+#include "todo/TodoHomeActivity.h"
 #include "util/FullScreenMessageActivity.h"
 
 static portMUX_TYPE activityManagerSpinlock = portMUX_INITIALIZER_UNLOCKED;
@@ -198,6 +199,8 @@ void ActivityManager::goToRecentBooks() {
   replaceActivity(std::make_unique<RecentBooksActivity>(renderer, mappedInput));
 }
 
+void ActivityManager::goToTodo() { replaceActivity(std::make_unique<TodoHomeActivity>(renderer, mappedInput)); }
+
 void ActivityManager::goToBrowser() {
   const auto& servers = OPDS_STORE.getServers();
   // Skip the server picker when there's only one server configured
@@ -236,6 +239,8 @@ void ActivityManager::goHome(HomeMenuItem initialMenuItem) {
       initialMenuItem = HomeMenuItem::FILE_TRANSFER;
     } else if (activityName == "Settings") {
       initialMenuItem = HomeMenuItem::SETTINGS_MENU;
+    } else if (activityName == "TodoHome") {
+      initialMenuItem = HomeMenuItem::TODO_APP;
     }
   }
   replaceActivity(std::make_unique<HomeActivity>(renderer, mappedInput, initialMenuItem));

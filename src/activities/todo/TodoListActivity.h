@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 
+#include "TodoButtonMapping.h"
 #include "TodoClock.h"
 #include "TodoData.h"
 #include "TodoMenuBar.h"
@@ -62,4 +63,9 @@ class TodoListActivity final : public Activity {
   void clampIndices(const CycleView& view);
   void switchList(int direction, const CycleView& view);
   void toggleCompleteAll(const CycleView& view);
+
+  // Button-hint labels (Section 5's per-context table) for the current focus and
+  // selection, in Default (LL/LR/RL/RR) order. `ids` is the current cycle entry's
+  // task IDs, as already computed by the caller (currentTaskIds(view)).
+  TodoButtonHints buttonHints(const CycleView& view, const std::vector<int>& ids) const;
 };

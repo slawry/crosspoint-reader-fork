@@ -42,6 +42,12 @@ TodoMenuBar::Action TodoMenuBar::processInput(const MappedInputManager& mappedIn
   return handleSlot(slot);
 }
 
+TodoButtonHints TodoMenuBar::hintLabels() const {
+  // LL is a no-op at the topmost entry (Settings); LR always does something --
+  // moves down, or (at the bottom-most entry) closes the bar -- so it's never hidden.
+  return todoButtonHints(selectorIndex > ENTRY_SETTINGS ? tr(STR_DIR_UP) : "", tr(STR_DIR_DOWN), tr(STR_SELECT), "");
+}
+
 int TodoMenuBar::renderAndGetContentTop(const GfxRenderer& renderer, const int x, const int y, const int width,
                                         const int rowHeight) const {
   const auto& metrics = UITheme::getInstance().getMetrics();
